@@ -42,12 +42,12 @@ export async function handleResearch(ctx: CommandContext<Context>): Promise<void
     return;
   }
 
-  const researchPrompt = `You are Mia in research mode. Gather what you know about the topic, synthesize it clearly and concisely with key facts, context, and any important caveats. Be thorough but direct.`;
+  const researchContext = "You are Mia in research mode. Use web search via curl if needed. Be thorough but direct.";
 
   await ctx.api.sendChatAction(chatId, "typing");
   try {
     addMessage(chatId, "user", topic);
-    const response = await executeWithMia(topic, `You are Mia in research mode. Use web search via curl if needed. Be thorough but direct.`);
+    const response = await executeWithMia(topic, researchContext);
     addMessage(chatId, "assistant", response);
     await ctx.reply(response);
   } catch (err) {

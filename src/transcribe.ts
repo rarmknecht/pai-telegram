@@ -1,6 +1,6 @@
 import { safeUnlink } from "./utils.ts";
+import { config } from "./config.ts";
 
-const WHISPER_VENV = process.env.WHISPER_VENV!;
 const TRANSCRIBE_SCRIPT = new URL("../scripts/transcribe.py", import.meta.url).pathname;
 
 export async function transcribeVoice(fileBuffer: Uint8Array, messageId: number): Promise<string> {
@@ -14,7 +14,7 @@ export async function transcribeVoice(fileBuffer: Uint8Array, messageId: number)
 }
 
 async function runWhisper(audioPath: string): Promise<string> {
-  const pythonBin = `${WHISPER_VENV}/bin/python3.14`;
+  const pythonBin = `${config.whisperVenv}/bin/${config.whisperPython}`;
   const proc = Bun.spawn([pythonBin, TRANSCRIBE_SCRIPT, audioPath], {
     stdout: "pipe",
     stderr: "pipe",

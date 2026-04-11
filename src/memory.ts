@@ -5,8 +5,7 @@
 
 import { appendFile } from "fs/promises";
 import type { Message } from "./session.ts";
-
-const MEMORY_FILE = `${process.env.HOME}/.claude/projects/-home-randy--claude/memory/telegram-sessions.md`;
+import { config } from "./config.ts";
 
 export async function writeSessionMemory(
   chatId: number,
@@ -23,5 +22,5 @@ export async function writeSessionMemory(
 
   const entry = `\n---\n**Session ${date} (chat ${chatId}, ${turns} messages)**\n${preview}\n`;
 
-  await appendFile(MEMORY_FILE, entry, "utf-8");
+  await appendFile(config.memoryFile, entry, "utf-8");
 }
