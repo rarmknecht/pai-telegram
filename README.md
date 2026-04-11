@@ -2,7 +2,7 @@
 
 A personal Telegram bot that puts a capable AI assistant — **Mia** — in your pocket. Send text or voice messages; get intelligent, tool-enabled responses back as text or spoken audio.
 
-Built with [Bun](https://bun.com), [grammY](https://grammy.dev), [Claude Code](https://claude.ai/code), [ElevenLabs](https://elevenlabs.io), and [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+Built with [PAI](https://github.com/danielmiessler/Personal_AI_Infrastructure), [Bun](https://bun.com), [grammY](https://grammy.dev), [Claude Code](https://claude.ai/code), [ElevenLabs](https://elevenlabs.io), and [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 
 ---
 
@@ -43,6 +43,7 @@ scripts/
 
 | Requirement | Notes |
 |---|---|
+| **[PAI](https://github.com/danielmiessler/Personal_AI_Infrastructure)** | Personal AI Infrastructure; supercharges Claude Code |
 | **[Bun](https://bun.com) ≥ 1.1** | JavaScript runtime — replaces Node.js |
 | **[Claude Code CLI](https://claude.ai/code)** | `claude` must be on your `PATH` and authenticated |
 | **Python 3.10+** | For the Whisper transcription virtual environment |
