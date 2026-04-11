@@ -1,8 +1,7 @@
 import { safeUnlink } from "./utils.ts";
+import { config } from "./config.ts";
 
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
-const MIA_VOICE_ID = process.env.MIA_VOICE_ID ?? "lcMyyd2HUfFzxdCaC4Ta";
-const TTS_URL = `https://api.elevenlabs.io/v1/text-to-speech/${MIA_VOICE_ID}`;
+const TTS_URL = `https://api.elevenlabs.io/v1/text-to-speech/${config.miaVoiceId}`;
 
 export async function generateTTS(text: string, messageId: number): Promise<string> {
   const response = await fetch(TTS_URL, {
@@ -10,7 +9,7 @@ export async function generateTTS(text: string, messageId: number): Promise<stri
     headers: {
       "Accept": "audio/mpeg",
       "Content-Type": "application/json",
-      "xi-api-key": ELEVENLABS_API_KEY,
+      "xi-api-key": config.elevenLabsApiKey,
     },
     body: JSON.stringify({
       text,

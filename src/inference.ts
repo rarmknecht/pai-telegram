@@ -4,8 +4,9 @@
  */
 
 import type { Message } from "./session.ts";
+import { config } from "./config.ts";
 
-const INFERENCE_PATH = process.env.INFERENCE_PATH!;
+const INFERENCE_PATH = config.inferencePath;
 
 const MIA_SYSTEM_PROMPT = `You are Mia, a highly capable Personal AI assistant. You are direct, warm, enthusiastic, and sharp. You speak naturally and concisely — no corporate filler, no hedging. You remember the context of the current conversation. When asked to research, you gather information and synthesize it clearly. When asked to help with tasks, you focus on the simplest, most effective approach. Keep responses conversational and appropriately brief for a messaging context.`;
 
@@ -25,6 +26,7 @@ export async function askMia(
   systemOverride?: string
 ): Promise<string> {
   const inference = await getInference();
+  if (!inference) throw new Error("Inference module failed to load — check INFERENCE_PATH");
 
   let contextBlock = "";
   if (history.length > 0) {

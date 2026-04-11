@@ -4,18 +4,16 @@ import { executeWithMia } from "./executor.ts";
 import { transcribeVoice } from "./transcribe.ts";
 import { cleanupTTS, generateTTS } from "./tts.ts";
 import { handleEnd, handleHelp, handleResearch, handleStart } from "./commands.ts";
+import { config } from "./config.ts";
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const OWNER_ID = parseInt(process.env.OWNER_ID ?? "0", 10);
-
-if (!BOT_TOKEN) throw new Error("BOT_TOKEN not set in .env");
-if (!OWNER_ID) throw new Error("OWNER_ID not set in .env");
-
-const bot = new Bot(BOT_TOKEN);
+const bot = new Bot(config.botToken);
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 bot.use(async (ctx, next) => {
-  if (ctx.from?.id !== OWNER_ID) return;
+  if (ctx.from?.id !== config.ownerId) {
+    console.warn(`[auth] Rejected update from user ${ctx.from?.id ?? "unknown"}`);
+    return;
+  }
   await next();
 });
 
@@ -60,7 +58,7 @@ bot.on("message:voice", async (ctx) => {
     await ctx.api.sendChatAction(chatId, "typing");
 
     const file = await ctx.getFile();
-    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+    const fileUrl = `https://api.telegram.org/file/bot${config.botToken}/${file.file_path}`;
     const resp = await fetch(fileUrl);
     if (!resp.ok) throw new Error(`Failed to download voice file: ${resp.status}`);
     const buffer = new Uint8Array(await resp.arrayBuffer());
@@ -87,12 +85,12 @@ bot.on("message:voice", async (ctx) => {
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 bot.catch((err) => {
-  console.error("[bot error]", err.message);
+  console.error("[bot error]", err);
 });
 
 console.log("Mia Telegram bot starting...");
 bot.start({
   onStart: (info) => {
-    console.log(`Bot running as @${info.username} | Owner ID: ${OWNER_ID}`);
+    console.log(`Bot running as @${info.username} | Owner ID: ${config.ownerId}`);
   },
 });
