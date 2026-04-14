@@ -47,5 +47,7 @@ export async function executeWithMia(
     throw new Error(`Execution failed (exit ${exitCode}): ${err.slice(0, 400)}`);
   }
 
-  return (await Bun.readableStreamToText(proc.stdout as ReadableStream)).trim();
+  const result = (await Bun.readableStreamToText(proc.stdout as ReadableStream)).trim();
+  if (!result) throw new Error("No response from Claude — it may be rate-limited or temporarily unavailable.");
+  return result;
 }

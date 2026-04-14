@@ -73,6 +73,7 @@ bot.on("message:voice", async (ctx) => {
 
     const reply = await handleInference(chatId, transcript, ctx);
 
+    if (!reply) return;
     await ctx.api.sendChatAction(chatId, "record_voice");
     ttsPath = await generateTTS(reply, msgId);
     await ctx.replyWithVoice(new InputFile(ttsPath));
@@ -86,6 +87,7 @@ bot.on("message:voice", async (ctx) => {
 // ── Startup ───────────────────────────────────────────────────────────────────
 bot.catch((err) => {
   console.error("[bot error]", err);
+  err.ctx?.reply("Something went wrong on my end. Please try again.").catch(() => {});
 });
 
 console.log("Mia Telegram bot starting...");
