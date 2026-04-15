@@ -64,7 +64,7 @@ curl -fsSL https://bun.sh/install | bash
 ### 2 — Clone and install dependencies
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/pai-telegram.git
+git clone https://github.com/rarmknecht/pai-telegram.git
 cd pai-telegram
 bun install
 ```
