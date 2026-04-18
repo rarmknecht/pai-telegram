@@ -5,6 +5,7 @@ import { transcribeVoice } from "./transcribe.ts";
 import { cleanupTTS, generateTTS } from "./tts.ts";
 import { handleEnd, handleHelp, handleResearch, handleStart } from "./commands.ts";
 import { config } from "./config.ts";
+import { sendLongMessage } from "./utils.ts";
 
 const bot = new Bot(config.botToken);
 
@@ -35,7 +36,7 @@ async function handleInference(chatId: number, text: string, ctx: Context): Prom
 
   const reply = await executeWithMia(text, conversationContext);
   addMessage(chatId, "assistant", reply);
-  await ctx.reply(reply);
+  await sendLongMessage(ctx, reply);
   return reply;
 }
 

@@ -6,6 +6,7 @@ import type { CommandContext, Context } from "grammy";
 import { addMessage, clearHistory, getHistory } from "./session.ts";
 import { writeSessionMemory } from "./memory.ts";
 import { executeWithMia } from "./executor.ts";
+import { sendLongMessage } from "./utils.ts";
 
 export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
   const chatId = ctx.chat.id;
@@ -49,7 +50,7 @@ export async function handleResearch(ctx: CommandContext<Context>): Promise<void
     addMessage(chatId, "user", topic);
     const response = await executeWithMia(topic, researchContext);
     addMessage(chatId, "assistant", response);
-    await ctx.reply(response);
+    await sendLongMessage(ctx, response);
   } catch (err) {
     await ctx.reply(`Research failed: ${(err as Error).message}`);
   }
