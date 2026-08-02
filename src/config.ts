@@ -5,6 +5,8 @@
  * fast with a clear error rather than crashing at the first API call.
  */
 
+import { resolveSessionCwd } from "./utils.ts";
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Required environment variable "${name}" is not set`);
@@ -22,13 +24,6 @@ function parseOwnerId(): number {
     throw new Error(`OWNER_ID must be a positive integer, got: "${raw}"`);
   }
   return id;
-}
-
-function resolveMemoryFile(): string {
-  const home = process.env.HOME ?? "";
-  const user = process.env.USER ?? process.env.LOGNAME ?? "user";
-  const defaultPath = `${home}/.claude/projects/-home-${user}--claude/memory/telegram-sessions.md`;
-  return optionalEnv("PAI_MEMORY_FILE", defaultPath);
 }
 
 export const config = {
@@ -54,13 +49,9 @@ export const config = {
    */
   whisperPython: optionalEnv("WHISPER_PYTHON", "python3"),
 
-  /** Absolute path to PAI's Inference.ts tool */
-  inferencePath: requireEnv("INFERENCE_PATH"),
-
   /**
-   * Absolute path to the PAI memory file where sessions are appended.
-   * Defaults to ~/.claude/projects/-home-{USER}--claude/memory/telegram-sessions.md
-   * Override with PAI_MEMORY_FILE if your setup differs.
+   * Working directory every Claude Code session runs in.
+   * Defaults to $HOME. Validated at startup so a bad path fails immediately.
    */
-  memoryFile: resolveMemoryFile(),
+  sessionCwd: resolveSessionCwd(process.env.SESSION_CWD, process.env.HOME ?? ""),
 } as const;

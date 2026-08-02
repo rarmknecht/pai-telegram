@@ -1,4 +1,5 @@
 import { unlink } from "node:fs/promises";
+import { statSync } from "node:fs";
 import type { Context } from "grammy";
 
 export async function safeUnlink(path: string): Promise<void> {
@@ -52,4 +53,27 @@ function splitMessage(text: string, maxLen: number): string[] {
   }
 
   return chunks;
+}
+
+/**
+ * Resolves the working directory every Claude Code session runs in.
+ * Falls back to the home directory when SESSION_CWD is unset, and fails fast
+ * at startup rather than at the first message if the path is unusable.
+ */
+export function resolveSessionCwd(raw: string | undefined, home: string): string {
+  const path = raw?.trim() || home;
+  if (!path) {
+    throw new Error("SESSION_CWD is unset and HOME is empty — cannot resolve a working directory");
+  }
+
+  let stat;
+  try {
+    stat = statSync(path);
+  } catch {
+    throw new Error(`SESSION_CWD does not exist: ${path}`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`SESSION_CWD is not a directory: ${path}`);
+  }
+  return path;
 }

@@ -3,8 +3,7 @@
  */
 
 import type { CommandContext, Context } from "grammy";
-import { addMessage, clearHistory, getHistory } from "./session.ts";
-import { writeSessionMemory } from "./memory.ts";
+import { addMessage, clearHistory } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { sendLongMessage } from "./utils.ts";
 
@@ -28,11 +27,8 @@ export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
 }
 
 export async function handleEnd(ctx: CommandContext<Context>): Promise<void> {
-  const chatId = ctx.chat.id;
-  const history = getHistory(chatId);
-  await writeSessionMemory(chatId, history);
-  clearHistory(chatId);
-  await ctx.reply("Session saved to memory. Starting fresh.");
+  clearHistory(ctx.chat.id);
+  await ctx.reply("Session ended. Starting fresh.");
 }
 
 export async function handleResearch(ctx: CommandContext<Context>): Promise<void> {
