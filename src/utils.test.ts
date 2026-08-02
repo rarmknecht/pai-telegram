@@ -1,3 +1,8 @@
+/**
+ * Tests for resolveSessionCwd in ./utils.ts — the SESSION_CWD fallback,
+ * validation, and error paths.
+ */
+
 import { test, expect } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

@@ -18,8 +18,8 @@ export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
 export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
   await ctx.reply(
     "Available commands:\n" +
-    "/start — Reset conversation context\n" +
-    "/end — Save session to memory and reset\n" +
+    "/start — Start a fresh session\n" +
+    "/end — End this session and start fresh\n" +
     "/research <topic> — Research mode\n" +
     "/help — Show this message\n\n" +
     "Send text or voice messages to chat with me."
