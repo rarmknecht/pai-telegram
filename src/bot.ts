@@ -5,6 +5,7 @@ import { cleanupTTS, generateTTS } from "./tts.ts";
 import { handleEnd, handleHelp, handleResearch, handleStart } from "./commands.ts";
 import { config } from "./config.ts";
 import { sendLongMessage } from "./utils.ts";
+import { withChatLock } from "./lock.ts";
 
 const bot = new Bot(config.botToken);
 
@@ -34,7 +35,7 @@ async function handleInference(chatId: number, text: string, ctx: Context): Prom
 // ── Text messages ─────────────────────────────────────────────────────────────
 bot.on("message:text", async (ctx) => {
   try {
-    await handleInference(ctx.chat.id, ctx.message.text, ctx);
+    await withChatLock(ctx.chat.id, () => handleInference(ctx.chat.id, ctx.message.text, ctx));
   } catch (err) {
     await ctx.reply(`Error: ${(err as Error).message}`);
   }
@@ -63,7 +64,7 @@ bot.on("message:voice", async (ctx) => {
 
     await ctx.reply(`_Heard: "${transcript}"_`, { parse_mode: "Markdown" });
 
-    const reply = await handleInference(chatId, transcript, ctx);
+    const reply = await withChatLock(chatId, () => handleInference(chatId, transcript, ctx));
 
     if (!reply) return;
     await ctx.api.sendChatAction(chatId, "record_voice");

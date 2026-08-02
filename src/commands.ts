@@ -6,6 +6,7 @@ import type { CommandContext, Context } from "grammy";
 import { resetSession } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { sendLongMessage } from "./utils.ts";
+import { withChatLock } from "./lock.ts";
 
 export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
   resetSession(ctx.chat.id);
@@ -38,7 +39,7 @@ export async function handleResearch(ctx: CommandContext<Context>): Promise<void
 
   await ctx.api.sendChatAction(chatId, "typing");
   try {
-    const response = await executeWithMia(chatId, topic);
+    const response = await withChatLock(chatId, () => executeWithMia(chatId, topic));
     await sendLongMessage(ctx, response);
   } catch (err) {
     await ctx.reply(`Research failed: ${(err as Error).message}`);
