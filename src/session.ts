@@ -1,37 +1,38 @@
 /**
- * Per-chat session manager.
- * Holds conversation history for context window management.
+ * Per-chat Claude Code session map.
+ * The bot holds only a session UUID — Claude Code owns the transcript, so
+ * there is no conversation history here to truncate or replay.
  */
 
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
+export interface Session {
+  /** Session UUID passed to claude via --session-id, then --resume */
+  id: string;
+  /** True once a spawn for this session has exited successfully */
+  started: boolean;
 }
 
-const sessions = new Map<number, Message[]>();
+const sessions = new Map<number, Session>();
 
-export function getHistory(chatId: number): Message[] {
-  let history = sessions.get(chatId);
-  if (!history) {
-    history = [];
-    sessions.set(chatId, history);
+export function getSession(chatId: number): Session {
+  let session = sessions.get(chatId);
+  if (!session) {
+    session = { id: crypto.randomUUID(), started: false };
+    sessions.set(chatId, session);
   }
-  return history;
+  return session;
 }
 
-export function addMessage(chatId: number, role: Message["role"], content: string): void {
-  const history = getHistory(chatId);
-  history.push({ role, content });
-  // Keep last 40 messages (20 turns) to stay within context limits
-  if (history.length > 40) {
-    history.splice(0, history.length - 40);
-  }
+/**
+ * Marks the session as created. Called only after a successful spawn so a
+ * failed first message does not strand the chat resuming a session that
+ * Claude Code never wrote.
+ */
+export function markStarted(chatId: number): void {
+  getSession(chatId).started = true;
 }
 
-export function clearHistory(chatId: number): void {
-  sessions.set(chatId, []);
-}
-
-export function getAllSessions(): Map<number, Message[]> {
-  return sessions;
+export function resetSession(chatId: number): Session {
+  const session: Session = { id: crypto.randomUUID(), started: false };
+  sessions.set(chatId, session);
+  return session;
 }

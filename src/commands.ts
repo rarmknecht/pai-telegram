@@ -3,16 +3,13 @@
  */
 
 import type { CommandContext, Context } from "grammy";
-import { addMessage, clearHistory } from "./session.ts";
+import { resetSession } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { sendLongMessage } from "./utils.ts";
 
 export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
-  const chatId = ctx.chat.id;
-  clearHistory(chatId);
-  await ctx.reply(
-    "Hey! I'm Mia. Fresh conversation started. What's on your mind?"
-  );
+  resetSession(ctx.chat.id);
+  await ctx.reply("Hey! I'm Mia. Fresh conversation started. What's on your mind?");
 }
 
 export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
@@ -27,8 +24,8 @@ export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
 }
 
 export async function handleEnd(ctx: CommandContext<Context>): Promise<void> {
-  clearHistory(ctx.chat.id);
-  await ctx.reply("Session ended. Starting fresh.");
+  resetSession(ctx.chat.id);
+  await ctx.reply("Session ended — the transcript stays in Claude Code's history. Starting fresh.");
 }
 
 export async function handleResearch(ctx: CommandContext<Context>): Promise<void> {
@@ -39,13 +36,9 @@ export async function handleResearch(ctx: CommandContext<Context>): Promise<void
     return;
   }
 
-  const researchContext = "You are Mia in research mode. Use web search via curl if needed. Be thorough but direct.";
-
   await ctx.api.sendChatAction(chatId, "typing");
   try {
-    addMessage(chatId, "user", topic);
-    const response = await executeWithMia(topic, researchContext);
-    addMessage(chatId, "assistant", response);
+    const response = await executeWithMia(chatId, topic);
     await sendLongMessage(ctx, response);
   } catch (err) {
     await ctx.reply(`Research failed: ${(err as Error).message}`);

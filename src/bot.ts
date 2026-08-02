@@ -1,5 +1,4 @@
 import { Bot, InputFile, type Context } from "grammy";
-import { addMessage, getHistory } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { transcribeVoice } from "./transcribe.ts";
 import { cleanupTTS, generateTTS } from "./tts.ts";
@@ -26,16 +25,8 @@ bot.command("research", handleResearch);
 
 // ── Shared execution helper ───────────────────────────────────────────────────
 async function handleInference(chatId: number, text: string, ctx: Context): Promise<string> {
-  const priorHistory = getHistory(chatId);
-  const conversationContext = priorHistory
-    .map((m) => `${m.role === "user" ? "User" : "Mia"}: ${m.content}`)
-    .join("\n");
-
-  addMessage(chatId, "user", text);
   await ctx.api.sendChatAction(chatId, "typing");
-
-  const reply = await executeWithMia(text, conversationContext);
-  addMessage(chatId, "assistant", reply);
+  const reply = await executeWithMia(chatId, text);
   await sendLongMessage(ctx, reply);
   return reply;
 }
