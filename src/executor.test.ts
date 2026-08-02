@@ -52,7 +52,7 @@ test("returns trimmed stdout and marks the session started", async () => {
 test("a failed resume mints a fresh session and retries once", async () => {
   const chatId = 2002;
   const staleId = getSession(chatId).id;
-  markStarted(chatId);
+  markStarted(getSession(chatId));
 
   const attempts: string[][] = [];
   const reply = await executeWithMia(chatId, "hello", 1000, async (args) => {
@@ -99,7 +99,7 @@ test("empty output is reported as no response", async () => {
 
 test("a stale resume where both attempts fail calls the runner exactly twice", async () => {
   const chatId = 2006;
-  markStarted(chatId);
+  markStarted(getSession(chatId));
 
   let calls = 0;
   const attempt = executeWithMia(chatId, "hello", 1000, async () => {
@@ -113,7 +113,7 @@ test("a stale resume where both attempts fail calls the runner exactly twice", a
 
 test("a non-stale resume failure does not retry and leaves the session id unchanged", async () => {
   const chatId = 2007;
-  markStarted(chatId);
+  markStarted(getSession(chatId));
   const staleId = getSession(chatId).id;
 
   let calls = 0;
@@ -135,5 +135,75 @@ test("a first-turn failure resets the session so the next message gets a clean i
 
   await expect(attempt).rejects.toThrow("exit 1");
   expect(getSession(chatId).id).not.toBe(before);
+  expect(getSession(chatId).started).toBe(false);
+});
+
+test("a first-turn timeout keeps the id and marks it started", async () => {
+  // claude ran, so it has already written the session file for this UUID.
+  // Leaving started false would spawn --session-id against a consumed id next
+  // message and fail with "already in use" forever; resuming instead picks up
+  // whatever partial transcript exists.
+  const chatId = 2009;
+  const before = resetSession(chatId).id;
+
+  const attempt = executeWithMia(chatId, "hello", 300000, async () => ({
+    stdout: "",
+    stderr: "",
+    exitCode: 143,
+    timedOut: true,
+  }));
+
+  await expect(attempt).rejects.toThrow("Timed out after 300s");
+  expect(getSession(chatId).id).toBe(before);
+  expect(getSession(chatId).started).toBe(true);
+});
+
+test("a first turn that exits 0 with empty stdout keeps the id and marks it started", async () => {
+  // Same consumed-UUID hazard as the timeout: exit 0 means claude wrote the
+  // session file even though it returned nothing usable.
+  const chatId = 2010;
+  const before = resetSession(chatId).id;
+
+  const attempt = executeWithMia(chatId, "hello", 1000, async () => ok("   "));
+
+  await expect(attempt).rejects.toThrow("No response from Claude");
+  expect(getSession(chatId).id).toBe(before);
+  expect(getSession(chatId).started).toBe(true);
+});
+
+test("a /start landing mid-spawn leaves the fresh session untouched", async () => {
+  const chatId = 2011;
+  const usedId = resetSession(chatId).id;
+
+  let freshId = "";
+  const reply = await executeWithMia(chatId, "hello", 1000, async () => {
+    // Simulates /start arriving while claude is still running: the chat's
+    // session is swapped out from under this run.
+    freshId = resetSession(chatId).id;
+    return ok("done");
+  });
+
+  expect(reply).toBe("done");
+  expect(freshId).not.toBe(usedId);
+  // The run must mark the session it actually used, not whatever the map holds
+  // now — otherwise the next message resumes a UUID claude never wrote.
+  expect(getSession(chatId).id).toBe(freshId);
+  expect(getSession(chatId).started).toBe(false);
+});
+
+test("a /start landing mid-spawn is not clobbered by a first-turn failure reset", async () => {
+  const chatId = 2012;
+  resetSession(chatId);
+
+  let freshId = "";
+  const attempt = executeWithMia(chatId, "hello", 1000, async () => {
+    freshId = resetSession(chatId).id;
+    return fail("boom");
+  });
+
+  await expect(attempt).rejects.toThrow("exit 1");
+  // The failed run's reset must no-op: the concurrent /start already handed the
+  // chat a clean, unused session and minting another would discard it.
+  expect(getSession(chatId).id).toBe(freshId);
   expect(getSession(chatId).started).toBe(false);
 });

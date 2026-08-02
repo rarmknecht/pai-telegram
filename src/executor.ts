@@ -7,7 +7,7 @@
  * Claude Code's transcript, never in the prompt.
  */
 
-import { getSession, markStarted, resetSession, type Session } from "./session.ts";
+import { getSession, markStarted, resetSessionIfCurrent, type Session } from "./session.ts";
 import { config } from "./config.ts";
 
 const MIA_EXECUTOR_SYSTEM_PROMPT = `You are Mia, a highly capable Personal AI assistant running on the user's Linux machine. You have access to the Bash tool and can run shell commands, Python scripts, curl requests, and anything else needed to complete tasks. When asked to do something that requires computation or web access, do it — don't just describe how. Complete tasks fully. Report results clearly and concisely. Available tools: curl, python3, bun, standard Linux utilities.`;
@@ -96,7 +96,10 @@ export async function executeWithMia(
 
     if (staleResume) {
       const firstStderr = result.stderr;
-      session = resetSession(chatId);
+      // Guarded against a `/start` that landed mid-spawn: that already gave the
+      // chat a clean unstarted session, so retry against it instead of
+      // discarding it for yet another fresh UUID.
+      session = resetSessionIfCurrent(chatId, session);
       result = await run(buildClaudeArgs(session), userText, timeoutMs);
       if (result.exitCode !== 0 && !result.timedOut) {
         throw new Error(
@@ -105,24 +108,35 @@ export async function executeWithMia(
         );
       }
     } else {
-      if (!wasResume) resetSession(chatId);
+      if (!wasResume) resetSessionIfCurrent(chatId, session);
       throw new Error(`Execution failed (exit ${result.exitCode}): ${result.stderr.slice(0, 400)}`);
     }
   }
+
+  // Past this point the process ran and either produced nothing usable or was
+  // killed. On a first turn claude has already written the session file, so the
+  // UUID is consumed: mark it started before throwing, or the next message
+  // spawns --session-id against a used id and fails with "already in use"
+  // forever. A later --resume instead picks up whatever partial transcript
+  // exists, at no extra round trip. On a resume this is already true and the
+  // call is a no-op.
 
   // A process that exits right at the timeout boundary can race the kill
   // signal and still report exit 0; only treat it as a timeout if it also
   // failed to exit cleanly.
   if (result.timedOut && result.exitCode !== 0) {
+    markStarted(session);
     throw new Error(`Timed out after ${Math.round(timeoutMs / 1000)}s.`);
   }
   if (result.exitCode !== 0) {
+    markStarted(session);
     throw new Error(`Execution failed (exit ${result.exitCode}): ${result.stderr.slice(0, 400)}`);
   }
   if (!result.stdout.trim()) {
+    markStarted(session);
     throw new Error("No response from Claude — it may be rate-limited or temporarily unavailable.");
   }
 
-  markStarted(chatId);
+  markStarted(session);
   return result.stdout.trim();
 }

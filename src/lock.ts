@@ -10,11 +10,13 @@ const chains = new Map<number, Promise<unknown>>();
 
 export function withChatLock<T>(chatId: number, fn: () => Promise<T>): Promise<T> {
   const prior = chains.get(chatId) ?? Promise.resolve();
-  // Run fn whether the previous turn resolved or rejected — one failure must
-  // not wedge the chat forever.
+  // The onRejected half of .then(fn, fn) is unreachable today: the link stored
+  // below is .catch-wrapped, so `prior` always resolves. It stays as a guard so
+  // the invariant survives a future change to what gets stored — a failed turn
+  // must never wedge the chat, and this keeps fn running either way.
   const next = prior.then(fn, fn);
-  // The stored link swallows rejections so it never surfaces as an unhandled
-  // rejection; the caller still receives the real promise.
+  // Store a rejection-swallowing copy so a failed turn never surfaces as an
+  // unhandled rejection; the caller still receives the real promise.
   chains.set(chatId, next.catch(() => {}));
   return next;
 }
