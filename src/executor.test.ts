@@ -96,3 +96,44 @@ test("empty output is reported as no response", async () => {
   const attempt = executeWithMia(2005, "hello", 1000, async () => ok("   "));
   await expect(attempt).rejects.toThrow("No response from Claude");
 });
+
+test("a stale resume where both attempts fail calls the runner exactly twice", async () => {
+  const chatId = 2006;
+  markStarted(chatId);
+
+  let calls = 0;
+  const attempt = executeWithMia(chatId, "hello", 1000, async () => {
+    calls++;
+    return fail("No conversation found");
+  });
+
+  await expect(attempt).rejects.toThrow();
+  expect(calls).toBe(2);
+});
+
+test("a non-stale resume failure does not retry and leaves the session id unchanged", async () => {
+  const chatId = 2007;
+  markStarted(chatId);
+  const staleId = getSession(chatId).id;
+
+  let calls = 0;
+  const attempt = executeWithMia(chatId, "hello", 1000, async () => {
+    calls++;
+    return fail("rate limit exceeded");
+  });
+
+  await expect(attempt).rejects.toThrow("exit 1");
+  expect(calls).toBe(1);
+  expect(getSession(chatId).id).toBe(staleId);
+});
+
+test("a first-turn failure resets the session so the next message gets a clean id", async () => {
+  const chatId = 2008;
+  const before = resetSession(chatId).id;
+
+  const attempt = executeWithMia(chatId, "hello", 1000, async () => fail("boom"));
+
+  await expect(attempt).rejects.toThrow("exit 1");
+  expect(getSession(chatId).id).not.toBe(before);
+  expect(getSession(chatId).started).toBe(false);
+});
