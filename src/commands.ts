@@ -8,6 +8,14 @@ import { executeWithMia } from "./executor.ts";
 import { sendLongMessage } from "./utils.ts";
 import { withChatLock } from "./lock.ts";
 
+/**
+ * Research mode is a one-off instruction on the user turn, not a system
+ * prompt change — the system prompt must stay constant for prompt caching.
+ */
+export function buildResearchPrompt(topic: string): string {
+  return `Research mode: use web search via curl if needed. Be thorough but direct.\n\nResearch this topic and report what you find: ${topic}`;
+}
+
 export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
   resetSession(ctx.chat.id);
   await ctx.reply("Hey! I'm Mia. Fresh conversation started. What's on your mind?");
@@ -39,7 +47,9 @@ export async function handleResearch(ctx: CommandContext<Context>): Promise<void
 
   await ctx.api.sendChatAction(chatId, "typing");
   try {
-    const response = await withChatLock(chatId, () => executeWithMia(chatId, topic));
+    const response = await withChatLock(chatId, () =>
+      executeWithMia(chatId, buildResearchPrompt(topic))
+    );
     await sendLongMessage(ctx, response);
   } catch (err) {
     await ctx.reply(`Research failed: ${(err as Error).message}`);
