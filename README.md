@@ -12,7 +12,7 @@ Built with [Bun](https://bun.com), [grammY](https://grammy.dev), [Claude Code](h
 |---|---|
 | **Text chat** | Each chat runs a persistent Claude Code session — context lives in Claude Code's transcript, not in the prompt |
 | **Voice messages** | Transcribed locally via Whisper, processed by Claude, replied with spoken TTS audio |
-| **Tool-enabled AI** | Claude runs with Bash tool access — it can execute scripts, make HTTP requests, and do real work |
+| **Tool-enabled AI** | Claude runs with its full tool set and no permission prompts — it can run shell commands, read and write files, and make HTTP requests on this machine |
 | **Slash commands** | `/start`, `/end`, `/help`, `/research <topic>` |
 | **Persistent sessions** | `--session-id` on the first message, `--resume` after, so history survives across messages and stays cached |
 | **Owner-only access** | Hard auth guard — all updates from other users are silently dropped |
@@ -26,7 +26,7 @@ Built with [Bun](https://bun.com), [grammY](https://grammy.dev), [Claude Code](h
 Telegram ──► bot.ts (grammY)
                 │
                 ├─► commands.ts     slash command handlers
-                ├─► executor.ts     spawns `claude --print` with Bash tool
+                ├─► executor.ts     spawns `claude --print` with the full tool set
                 ├─► transcribe.ts   downloads voice OGG → runs Whisper
                 ├─► tts.ts          ElevenLabs text-to-speech → MP3
                 ├─► session.ts      per-chat Claude Code session UUIDs
@@ -95,16 +95,26 @@ Open `.env` and set each variable:
 
 ```env
 # Required
-BOT_TOKEN=123456789:ABCdef...          # From BotFather
-OWNER_ID=987654321                     # Your Telegram numeric user ID
-ELEVENLABS_API_KEY=sk_...              # From elevenlabs.io → Profile → API Keys
+# BOT_TOKEN — from BotFather
+BOT_TOKEN=123456789:ABCdef...
+# OWNER_ID — your Telegram numeric user ID
+OWNER_ID=987654321
+# ELEVENLABS_API_KEY — from elevenlabs.io → Profile → API Keys
+ELEVENLABS_API_KEY=sk_...
 WHISPER_VENV=/absolute/path/to/pai-telegram/whisper-env
 
 # Optional — override defaults
-MIA_VOICE_ID=lcMyyd2HUfFzxdCaC4Ta     # ElevenLabs voice ID (default: Mia's voice)
-WHISPER_PYTHON=python3                 # Python binary inside the venv (default: python3)
-SESSION_CWD=/absolute/path/to/projects # Working dir for sessions (default: $HOME)
+# MIA_VOICE_ID — ElevenLabs voice ID (default: Mia's voice)
+MIA_VOICE_ID=lcMyyd2HUfFzxdCaC4Ta
+# WHISPER_PYTHON — Python binary inside the venv (default: python3)
+WHISPER_PYTHON=python3
+# SESSION_CWD — working dir for sessions (default: $HOME)
+SESSION_CWD=/absolute/path/to/projects
 ```
+
+> Keep every comment on its own line. Bun strips a trailing `# ...` after a
+> value, but systemd's `EnvironmentFile=` does not — under the systemd unit the
+> comment becomes part of the value and startup fails.
 
 > **Tool access** — Sessions run with Claude Code's full tool set and no permission prompts, so the bot can execute arbitrary commands on this machine. The owner-ID guard is the only thing standing between a Telegram message and your shell. Keep your bot token private.
 
@@ -152,24 +162,42 @@ No audio data leaves your machine except to ElevenLabs for synthesis.
 ```
 pai-telegram/
 ├── src/
-│   ├── bot.ts          Entry point — wires grammY, auth guard, message handlers
-│   ├── commands.ts     /start, /end, /help, /research handlers
-│   ├── config.ts       Env var validation and centralized config object
-│   ├── executor.ts     Spawns claude CLI with Bash tool for agentic responses
-│   ├── lock.ts         Per-chat serialization so turns cannot race
-│   ├── session.ts      Per-chat Claude Code session UUIDs
-│   ├── transcribe.ts   Manages temp files and calls the Python Whisper script
-│   ├── tts.ts          ElevenLabs TTS — returns path to MP3, caller cleans up
-│   └── utils.ts        Shared utilities (safeUnlink, etc.)
+│   ├── bot.ts             Entry point — wires grammY, auth guard, message handlers
+│   ├── commands.ts        /start, /end, /help, /research handlers
+│   ├── config.ts          Env var validation and centralized config object
+│   ├── executor.ts        Spawns the claude CLI with its full tool set
+│   ├── lock.ts            Per-chat serialization so turns cannot race
+│   ├── session.ts         Per-chat Claude Code session UUIDs
+│   ├── transcribe.ts      Manages temp files and calls the Python Whisper script
+│   ├── tts.ts             ElevenLabs TTS — returns path to MP3, caller cleans up
+│   ├── utils.ts           Shared utilities (safeUnlink, etc.)
+│   ├── commands.test.ts   Research prompt construction
+│   ├── executor.test.ts   Session lifecycle and the prompt-caching invariant
+│   ├── lock.test.ts       Per-chat serialization
+│   ├── session.test.ts    Session map semantics
+│   ├── utils.test.ts      SESSION_CWD resolution and validation
+│   └── wiring.test.ts     Source-level guard that handlers keep the chat lock
 ├── scripts/
-│   └── transcribe.py   Runs faster-whisper, prints transcript to stdout
-├── whisper-env/        Python venv (git-ignored) — created in Setup step 3
-├── .env.example        Template for environment variables
-├── .env                Your local config (git-ignored)
-├── index.ts            Bun entry shim
+│   └── transcribe.py      Runs faster-whisper, prints transcript to stdout
+├── whisper-env/           Python venv (git-ignored) — created in Setup step 3
+├── .env.example           Template for environment variables
+├── .env                   Your local config (git-ignored)
+├── index.ts               Unused `bun init` stub (`console.log("Hello via Bun!")`) —
+│                          the real entry point is `src/bot.ts`
 ├── package.json
 └── tsconfig.json
 ```
+
+Run the test suite with:
+
+```bash
+bun test
+```
+
+No test dependencies are needed — `bun test` is built in. `wiring.test.ts` is
+deliberately a source-text assertion: it guards that the executor call sites in
+`bot.ts` and `commands.ts` stay wrapped in `withChatLock`, which nothing else
+can catch without booting the bot against real Telegram traffic.
 
 ---
 
