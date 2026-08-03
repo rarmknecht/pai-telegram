@@ -16,12 +16,12 @@ logs
 _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+# dotenv environment variable files — ignore every variant, then allow the
+# template back in. This catches .env.local and .env.production as before, plus
+# hand-made copies like .env.bak-1785722031, any of which would otherwise be a
+# committable file full of live credentials.
+.env*
+!.env.example
 
 # caches
 .eslintcache

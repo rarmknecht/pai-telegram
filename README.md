@@ -116,9 +116,34 @@ SESSION_CWD=/absolute/path/to/projects
 > value, but systemd's `EnvironmentFile=` does not — under the systemd unit the
 > comment becomes part of the value and startup fails.
 
-> **Tool access** — Sessions run with Claude Code's full tool set and no permission prompts, so the bot can execute arbitrary commands on this machine. The owner-ID guard is the only thing standing between a Telegram message and your shell. Keep your bot token private.
+### 6 — Personalize Mia's prompt
 
-### 6 — Run the bot
+`src/prompts.ts` holds `MIA_SYSTEM_PROMPT` — the constant system prompt every
+session starts from. It is written for this repo's original owner and refers to
+him by name, so edit it before first run:
+
+```ts
+export const MIA_SYSTEM_PROMPT = `You are Mia, a highly capable personal AI
+assistant running on Randy's Linux machine.
+...
+```
+
+Change the assistant's name, the owner's name, and anything else you want her to
+know about your setup. Two things to keep in mind while editing:
+
+- **Keep it a plain constant.** No interpolation, no per-message variation. This
+  string is the cached prefix of every turn, so anything that changes between
+  messages silently costs you prompt caching. `src/executor.test.ts` has a test
+  that pins this.
+- **Write it in plain prose.** Replies are sent to Telegram without `parse_mode`,
+  so markdown is not rendered — a prompt that encourages bullets and code fences
+  produces literal asterisks and backticks on screen. The shipped prompt says so
+  explicitly; keep that part.
+
+The prompt is fixed when a session is created, so changes reach an existing chat
+only after `/start`.
+
+### 7 — Run the bot
 
 ```bash
 bun src/bot.ts
@@ -229,6 +254,16 @@ can catch without booting the bot against real Telegram traffic.
 **`claude` command not found**
 - Install Claude Code and ensure it is on your `PATH`: `which claude`
 - Run `claude` once manually to complete authentication before starting the bot.
+
+---
+
+<sub><a name="tool-access"></a>**On tool access.** Sessions run with Claude Code's
+full tool set and no permission prompts — that is the point of the project, not an
+oversight. A remote bridge to Claude Code that could not run commands would not be
+worth building. Authorization is the `OWNER_ID` check in `bot.ts`, which drops every
+update from any other Telegram user ID; single-owner gating on Telegram user ID is a
+standard, well-established control. Treat your bot token like any other credential
+that grants shell access.</sub>
 
 ---
 
