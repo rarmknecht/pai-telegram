@@ -51,3 +51,21 @@ test("handleResearch's executor call in commands.ts is wrapped by withChatLock",
   expect(total).toBe(1);
   expect(lockedCallCount(commandsSource, "executeWithMia")).toBe(total);
 });
+
+// The two tests below are source-level for the same reason as the lock guard
+// above: handleInference's return value looks identical to every other test
+// whether or not the voice directive is attached, because nothing here boots
+// grammY or inspects what Claude actually received. Only the source text
+// shows which call site builds the voice prompt and which one doesn't.
+
+test("the voice handler passes buildVoicePrompt(transcript) into handleInference", () => {
+  expect(botSource).toContain("handleInference(chatId, buildVoicePrompt(transcript), ctx)");
+});
+
+test("the text handler passes the message text bare, with no buildVoicePrompt wrapper", () => {
+  // If buildVoicePrompt ever leaked into the text handler, the speech
+  // directive ("answer in one or two conversational sentences") would
+  // contaminate every text chat, not just voice turns.
+  expect(botSource).toContain("handleInference(ctx.chat.id, ctx.message.text, ctx)");
+  expect(botSource).not.toMatch(/handleInference\(ctx\.chat\.id,\s*buildVoicePrompt/);
+});

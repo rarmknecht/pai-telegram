@@ -63,7 +63,7 @@ bot.on("message:voice", async (ctx) => {
       return;
     }
 
-    await ctx.reply(`_Heard: "${transcript}"_`, { parse_mode: "Markdown" });
+    await ctx.reply(`Heard: "${transcript}"`);
 
     const reply = await withChatLock(chatId, () =>
       handleInference(chatId, buildVoicePrompt(transcript), ctx)

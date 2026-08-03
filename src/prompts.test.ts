@@ -11,6 +11,14 @@ test("the system prompt states the plain-text constraint", () => {
   expect(MIA_SYSTEM_PROMPT).toContain("ToolSearch");
 });
 
+test("the system prompt names the broader tool set, not just Bash", () => {
+  // Understating the tool set (e.g. "you have access to the Bash tool") was
+  // one of the three defects this branch fixed. Agent and Read are good
+  // anchors because a regression to the old, narrower wording would drop them.
+  expect(MIA_SYSTEM_PROMPT).toContain("Agent");
+  expect(MIA_SYSTEM_PROMPT).toContain("Read");
+});
+
 test("the system prompt is itself written in plain prose", () => {
   // A prompt that demands plain prose while being written in bullets
   // undercuts itself. The check is structural — line-leading markers and
