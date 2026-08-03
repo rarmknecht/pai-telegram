@@ -9,8 +9,7 @@
 
 import { getSession, markStarted, resetSessionIfCurrent, type Session } from "./session.ts";
 import { config } from "./config.ts";
-
-const MIA_EXECUTOR_SYSTEM_PROMPT = `You are Mia, a highly capable Personal AI assistant running on the user's Linux machine. You have access to the Bash tool and can run shell commands, Python scripts, curl requests, and anything else needed to complete tasks. When asked to do something that requires computation or web access, do it — don't just describe how. Complete tasks fully. Report results clearly and concisely. Available tools: curl, python3, bun, standard Linux utilities.`;
+import { MIA_SYSTEM_PROMPT } from "./prompts.ts";
 
 const DEFAULT_TIMEOUT_MS = 300000; // 5 minutes for complex tasks
 
@@ -36,7 +35,7 @@ export function buildClaudeArgs(session: Session): string[] {
     "--model", "sonnet",
     "--output-format", "text",
     session.started ? "--resume" : "--session-id", session.id,
-    "--system-prompt", MIA_EXECUTOR_SYSTEM_PROMPT,
+    "--system-prompt", MIA_SYSTEM_PROMPT,
   ];
 }
 

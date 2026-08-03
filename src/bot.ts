@@ -6,6 +6,7 @@ import { handleEnd, handleHelp, handleResearch, handleStart } from "./commands.t
 import { config } from "./config.ts";
 import { sendLongMessage } from "./utils.ts";
 import { withChatLock } from "./lock.ts";
+import { buildVoicePrompt } from "./prompts.ts";
 
 const bot = new Bot(config.botToken);
 
@@ -62,9 +63,11 @@ bot.on("message:voice", async (ctx) => {
       return;
     }
 
-    await ctx.reply(`_Heard: "${transcript}"_`, { parse_mode: "Markdown" });
+    await ctx.reply(`Heard: "${transcript}"`);
 
-    const reply = await withChatLock(chatId, () => handleInference(chatId, transcript, ctx));
+    const reply = await withChatLock(chatId, () =>
+      handleInference(chatId, buildVoicePrompt(transcript), ctx)
+    );
 
     if (!reply) return;
     await ctx.api.sendChatAction(chatId, "record_voice");

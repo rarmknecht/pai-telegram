@@ -7,14 +7,7 @@ import { resetSession } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { sendLongMessage } from "./utils.ts";
 import { withChatLock } from "./lock.ts";
-
-/**
- * Research mode is a one-off instruction on the user turn, not a system
- * prompt change — the system prompt must stay constant for prompt caching.
- */
-export function buildResearchPrompt(topic: string): string {
-  return `Research mode: use web search via curl if needed. Be thorough but direct.\n\nResearch this topic and report what you find: ${topic}`;
-}
+import { buildResearchPrompt } from "./prompts.ts";
 
 export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
   resetSession(ctx.chat.id);

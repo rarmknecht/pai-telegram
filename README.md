@@ -139,7 +139,7 @@ Bot running as @your_bot_name | Owner ID: 987654321
 |---|---|
 | `/start` | Start a fresh session — the next message begins new context |
 | `/end` | End the current session and start fresh; the transcript stays in Claude Code's history |
-| `/research <topic>` | Research mode — Mia uses web access via curl to investigate a topic |
+| `/research <topic>` | Research mode — Mia loads WebSearch through ToolSearch to investigate a topic |
 | `/help` | Show available commands |
 
 ---
@@ -167,13 +167,14 @@ pai-telegram/
 │   ├── config.ts          Env var validation and centralized config object
 │   ├── executor.ts        Spawns the claude CLI with its full tool set
 │   ├── lock.ts            Per-chat serialization so turns cannot race
+│   ├── prompts.ts         System prompt and the per-medium user-turn prompt builders
 │   ├── session.ts         Per-chat Claude Code session UUIDs
 │   ├── transcribe.ts      Manages temp files and calls the Python Whisper script
 │   ├── tts.ts             ElevenLabs TTS — returns path to MP3, caller cleans up
 │   ├── utils.ts           Shared utilities (safeUnlink, etc.)
-│   ├── commands.test.ts   Research prompt construction
 │   ├── executor.test.ts   Session lifecycle and the prompt-caching invariant
 │   ├── lock.test.ts       Per-chat serialization
+│   ├── prompts.test.ts    System prompt and prompt builder texts
 │   ├── session.test.ts    Session map semantics
 │   ├── utils.test.ts      SESSION_CWD resolution and validation
 │   └── wiring.test.ts     Source-level guard that handlers keep the chat lock
