@@ -3,24 +3,29 @@
  */
 
 import type { CommandContext, Context } from "grammy";
-import { addMessage, clearHistory, getHistory } from "./session.ts";
-import { writeSessionMemory } from "./memory.ts";
+import { resetSession } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { sendLongMessage } from "./utils.ts";
+import { withChatLock } from "./lock.ts";
+
+/**
+ * Research mode is a one-off instruction on the user turn, not a system
+ * prompt change — the system prompt must stay constant for prompt caching.
+ */
+export function buildResearchPrompt(topic: string): string {
+  return `Research mode: use web search via curl if needed. Be thorough but direct.\n\nResearch this topic and report what you find: ${topic}`;
+}
 
 export async function handleStart(ctx: CommandContext<Context>): Promise<void> {
-  const chatId = ctx.chat.id;
-  clearHistory(chatId);
-  await ctx.reply(
-    "Hey! I'm Mia. Fresh conversation started. What's on your mind?"
-  );
+  resetSession(ctx.chat.id);
+  await ctx.reply("Hey! I'm Mia. Fresh conversation started. What's on your mind?");
 }
 
 export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
   await ctx.reply(
     "Available commands:\n" +
-    "/start — Reset conversation context\n" +
-    "/end — Save session to memory and reset\n" +
+    "/start — Start a fresh session\n" +
+    "/end — End this session and start fresh\n" +
     "/research <topic> — Research mode\n" +
     "/help — Show this message\n\n" +
     "Send text or voice messages to chat with me."
@@ -28,11 +33,8 @@ export async function handleHelp(ctx: CommandContext<Context>): Promise<void> {
 }
 
 export async function handleEnd(ctx: CommandContext<Context>): Promise<void> {
-  const chatId = ctx.chat.id;
-  const history = getHistory(chatId);
-  await writeSessionMemory(chatId, history);
-  clearHistory(chatId);
-  await ctx.reply("Session saved to memory. Starting fresh.");
+  resetSession(ctx.chat.id);
+  await ctx.reply("Session ended — the transcript stays in Claude Code's history. Starting fresh.");
 }
 
 export async function handleResearch(ctx: CommandContext<Context>): Promise<void> {
@@ -43,13 +45,11 @@ export async function handleResearch(ctx: CommandContext<Context>): Promise<void
     return;
   }
 
-  const researchContext = "You are Mia in research mode. Use web search via curl if needed. Be thorough but direct.";
-
   await ctx.api.sendChatAction(chatId, "typing");
   try {
-    addMessage(chatId, "user", topic);
-    const response = await executeWithMia(topic, researchContext);
-    addMessage(chatId, "assistant", response);
+    const response = await withChatLock(chatId, () =>
+      executeWithMia(chatId, buildResearchPrompt(topic))
+    );
     await sendLongMessage(ctx, response);
   } catch (err) {
     await ctx.reply(`Research failed: ${(err as Error).message}`);

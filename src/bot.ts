@@ -1,11 +1,11 @@
 import { Bot, InputFile, type Context } from "grammy";
-import { addMessage, getHistory } from "./session.ts";
 import { executeWithMia } from "./executor.ts";
 import { transcribeVoice } from "./transcribe.ts";
 import { cleanupTTS, generateTTS } from "./tts.ts";
 import { handleEnd, handleHelp, handleResearch, handleStart } from "./commands.ts";
 import { config } from "./config.ts";
 import { sendLongMessage } from "./utils.ts";
+import { withChatLock } from "./lock.ts";
 
 const bot = new Bot(config.botToken);
 
@@ -26,16 +26,8 @@ bot.command("research", handleResearch);
 
 // ── Shared execution helper ───────────────────────────────────────────────────
 async function handleInference(chatId: number, text: string, ctx: Context): Promise<string> {
-  const priorHistory = getHistory(chatId);
-  const conversationContext = priorHistory
-    .map((m) => `${m.role === "user" ? "User" : "Mia"}: ${m.content}`)
-    .join("\n");
-
-  addMessage(chatId, "user", text);
   await ctx.api.sendChatAction(chatId, "typing");
-
-  const reply = await executeWithMia(text, conversationContext);
-  addMessage(chatId, "assistant", reply);
+  const reply = await executeWithMia(chatId, text);
   await sendLongMessage(ctx, reply);
   return reply;
 }
@@ -43,7 +35,7 @@ async function handleInference(chatId: number, text: string, ctx: Context): Prom
 // ── Text messages ─────────────────────────────────────────────────────────────
 bot.on("message:text", async (ctx) => {
   try {
-    await handleInference(ctx.chat.id, ctx.message.text, ctx);
+    await withChatLock(ctx.chat.id, () => handleInference(ctx.chat.id, ctx.message.text, ctx));
   } catch (err) {
     await ctx.reply(`Error: ${(err as Error).message}`);
   }
@@ -72,7 +64,7 @@ bot.on("message:voice", async (ctx) => {
 
     await ctx.reply(`_Heard: "${transcript}"_`, { parse_mode: "Markdown" });
 
-    const reply = await handleInference(chatId, transcript, ctx);
+    const reply = await withChatLock(chatId, () => handleInference(chatId, transcript, ctx));
 
     if (!reply) return;
     await ctx.api.sendChatAction(chatId, "record_voice");

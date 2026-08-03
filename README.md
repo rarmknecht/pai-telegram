@@ -2,7 +2,7 @@
 
 A personal Telegram bot that puts a capable AI assistant — **Mia** — in your pocket. Send text or voice messages; get intelligent, tool-enabled responses back as text or spoken audio.
 
-Built with [PAI](https://github.com/danielmiessler/Personal_AI_Infrastructure), [Bun](https://bun.com), [grammY](https://grammy.dev), [Claude Code](https://claude.ai/code), [ElevenLabs](https://elevenlabs.io), and [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+Built with [Bun](https://bun.com), [grammY](https://grammy.dev), [Claude Code](https://claude.ai/code), [ElevenLabs](https://elevenlabs.io), and [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
 
 ---
 
@@ -10,11 +10,11 @@ Built with [PAI](https://github.com/danielmiessler/Personal_AI_Infrastructure), 
 
 | Capability | How it works |
 |---|---|
-| **Text chat** | Messages are sent to Claude Code CLI with conversation history for context |
+| **Text chat** | Each chat runs a persistent Claude Code session — context lives in Claude Code's transcript, not in the prompt |
 | **Voice messages** | Transcribed locally via Whisper, processed by Claude, replied with spoken TTS audio |
-| **Tool-enabled AI** | Claude runs with Bash tool access — it can execute scripts, make HTTP requests, and do real work |
+| **Tool-enabled AI** | Claude runs with its full tool set and no permission prompts — it can run shell commands, read and write files, and make HTTP requests on this machine |
 | **Slash commands** | `/start`, `/end`, `/help`, `/research <topic>` |
-| **Session memory** | `/end` appends a session summary to your PAI memory file |
+| **Persistent sessions** | `--session-id` on the first message, `--resume` after, so history survives across messages and stays cached |
 | **Owner-only access** | Hard auth guard — all updates from other users are silently dropped |
 | **Fast startup** | Fails immediately with a clear error if any required env var is missing |
 
@@ -26,11 +26,11 @@ Built with [PAI](https://github.com/danielmiessler/Personal_AI_Infrastructure), 
 Telegram ──► bot.ts (grammY)
                 │
                 ├─► commands.ts     slash command handlers
-                ├─► executor.ts     spawns `claude --print` with Bash tool
+                ├─► executor.ts     spawns `claude --print` with the full tool set
                 ├─► transcribe.ts   downloads voice OGG → runs Whisper
                 ├─► tts.ts          ElevenLabs text-to-speech → MP3
-                ├─► session.ts      in-memory per-chat conversation history
-                ├─► memory.ts       appends session summaries to PAI memory
+                ├─► session.ts      per-chat Claude Code session UUIDs
+                ├─► lock.ts         serializes turns within a chat
                 └─► config.ts       validates all env vars at startup
 
 scripts/
@@ -43,7 +43,6 @@ scripts/
 
 | Requirement | Notes |
 |---|---|
-| **[PAI](https://github.com/danielmiessler/Personal_AI_Infrastructure)** | Personal AI Infrastructure; supercharges Claude Code |
 | **[Bun](https://bun.com) ≥ 1.1** | JavaScript runtime — replaces Node.js |
 | **[Claude Code CLI](https://claude.ai/code)** | `claude` must be on your `PATH` and authenticated |
 | **Python 3.10+** | For the Whisper transcription virtual environment |
@@ -96,19 +95,28 @@ Open `.env` and set each variable:
 
 ```env
 # Required
-BOT_TOKEN=123456789:ABCdef...          # From BotFather
-OWNER_ID=987654321                     # Your Telegram numeric user ID
-ELEVENLABS_API_KEY=sk_...              # From elevenlabs.io → Profile → API Keys
-INFERENCE_PATH=/absolute/path/to/Inference.ts   # PAI Inference tool (see note below)
+# BOT_TOKEN — from BotFather
+BOT_TOKEN=123456789:ABCdef...
+# OWNER_ID — your Telegram numeric user ID
+OWNER_ID=987654321
+# ELEVENLABS_API_KEY — from elevenlabs.io → Profile → API Keys
+ELEVENLABS_API_KEY=sk_...
 WHISPER_VENV=/absolute/path/to/pai-telegram/whisper-env
 
 # Optional — override defaults
-MIA_VOICE_ID=lcMyyd2HUfFzxdCaC4Ta     # ElevenLabs voice ID (default: Mia's voice)
-WHISPER_PYTHON=python3                 # Python binary inside the venv (default: python3)
-PAI_MEMORY_FILE=/path/to/memory.md    # Session memory output file
+# MIA_VOICE_ID — ElevenLabs voice ID (default: Mia's voice)
+MIA_VOICE_ID=lcMyyd2HUfFzxdCaC4Ta
+# WHISPER_PYTHON — Python binary inside the venv (default: python3)
+WHISPER_PYTHON=python3
+# SESSION_CWD — working dir for sessions (default: $HOME)
+SESSION_CWD=/absolute/path/to/projects
 ```
 
-> **INFERENCE_PATH** — This project uses Claude Code's `Inference.ts` tool for AI calls. If you are not running PAI, you can remove or stub this variable and modify `src/executor.ts` to call the Claude API directly.
+> Keep every comment on its own line. Bun strips a trailing `# ...` after a
+> value, but systemd's `EnvironmentFile=` does not — under the systemd unit the
+> comment becomes part of the value and startup fails.
+
+> **Tool access** — Sessions run with Claude Code's full tool set and no permission prompts, so the bot can execute arbitrary commands on this machine. The owner-ID guard is the only thing standing between a Telegram message and your shell. Keep your bot token private.
 
 ### 6 — Run the bot
 
@@ -129,8 +137,8 @@ Bot running as @your_bot_name | Owner ID: 987654321
 
 | Command | Description |
 |---|---|
-| `/start` | Reset conversation — clears in-memory history and starts fresh |
-| `/end` | Save the current session to memory, then reset |
+| `/start` | Start a fresh session — the next message begins new context |
+| `/end` | End the current session and start fresh; the transcript stays in Claude Code's history |
 | `/research <topic>` | Research mode — Mia uses web access via curl to investigate a topic |
 | `/help` | Show available commands |
 
@@ -154,25 +162,42 @@ No audio data leaves your machine except to ElevenLabs for synthesis.
 ```
 pai-telegram/
 ├── src/
-│   ├── bot.ts          Entry point — wires grammY, auth guard, message handlers
-│   ├── commands.ts     /start, /end, /help, /research handlers
-│   ├── config.ts       Env var validation and centralized config object
-│   ├── executor.ts     Spawns claude CLI with Bash tool for agentic responses
-│   ├── inference.ts    Lightweight text-only inference (no tools)
-│   ├── memory.ts       Writes session summaries to PAI memory file
-│   ├── session.ts      In-memory per-chat conversation history
-│   ├── transcribe.ts   Manages temp files and calls the Python Whisper script
-│   ├── tts.ts          ElevenLabs TTS — returns path to MP3, caller cleans up
-│   └── utils.ts        Shared utilities (safeUnlink, etc.)
+│   ├── bot.ts             Entry point — wires grammY, auth guard, message handlers
+│   ├── commands.ts        /start, /end, /help, /research handlers
+│   ├── config.ts          Env var validation and centralized config object
+│   ├── executor.ts        Spawns the claude CLI with its full tool set
+│   ├── lock.ts            Per-chat serialization so turns cannot race
+│   ├── session.ts         Per-chat Claude Code session UUIDs
+│   ├── transcribe.ts      Manages temp files and calls the Python Whisper script
+│   ├── tts.ts             ElevenLabs TTS — returns path to MP3, caller cleans up
+│   ├── utils.ts           Shared utilities (safeUnlink, etc.)
+│   ├── commands.test.ts   Research prompt construction
+│   ├── executor.test.ts   Session lifecycle and the prompt-caching invariant
+│   ├── lock.test.ts       Per-chat serialization
+│   ├── session.test.ts    Session map semantics
+│   ├── utils.test.ts      SESSION_CWD resolution and validation
+│   └── wiring.test.ts     Source-level guard that handlers keep the chat lock
 ├── scripts/
-│   └── transcribe.py   Runs faster-whisper, prints transcript to stdout
-├── whisper-env/        Python venv (git-ignored) — created in Setup step 3
-├── .env.example        Template for environment variables
-├── .env                Your local config (git-ignored)
-├── index.ts            Bun entry shim
+│   └── transcribe.py      Runs faster-whisper, prints transcript to stdout
+├── whisper-env/           Python venv (git-ignored) — created in Setup step 3
+├── .env.example           Template for environment variables
+├── .env                   Your local config (git-ignored)
+├── index.ts               Unused `bun init` stub (`console.log("Hello via Bun!")`) —
+│                          the real entry point is `src/bot.ts`
 ├── package.json
 └── tsconfig.json
 ```
+
+Run the test suite with:
+
+```bash
+bun test
+```
+
+No test dependencies are needed — `bun test` is built in. `wiring.test.ts` is
+deliberately a source-text assertion: it guards that the executor call sites in
+`bot.ts` and `commands.ts` stay wrapped in `withChatLock`, which nothing else
+can catch without booting the bot against real Telegram traffic.
 
 ---
 
